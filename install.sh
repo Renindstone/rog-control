@@ -5,16 +5,18 @@ set -e
 cd "$(dirname "$0")"
 
 DEST="$HOME/.local/share/rog-control"
-mkdir -p "$DEST" "$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$DEST" "$HOME/.local/share/applications" "$ICON_DIR"
 cp -r rog-control.py rogmouse assets "$DEST/"
 rm -rf "$DEST/rogmouse/__pycache__"
+cp assets/icon.svg "$ICON_DIR/io.github.rogcontrol.HarpeAceMini.svg"
 
 cat > "$HOME/.local/share/applications/io.github.rogcontrol.HarpeAceMini.desktop" <<EOF
 [Desktop Entry]
 Name=ROG Control
 Comment=Configura tu ROG Harpe Ace Mini
 Exec=python3 $DEST/rog-control.py
-Icon=input-mouse
+Icon=io.github.rogcontrol.HarpeAceMini
 Terminal=false
 Type=Application
 Categories=Settings;HardwareSettings;
