@@ -39,3 +39,7 @@ Así que siguen funcionando aunque cierres la app o conectes el mouse a otra PC.
 Los formatos de los paquetes se verificaron contra el mouse real. Se tomaron como referencia
 el driver ASUS de [libratbag](https://github.com/libratbag/libratbag) y el modelo
 Harpe Ace Mini de [G-Helper](https://github.com/seerge/g-helper).
+
+El logo de fondo (`assets/rog-logo.svg`) es el trazo de Republic of Gamers de
+[Simple Icons](https://simpleicons.org) (CC0). ROG es una marca registrada de ASUSTeK,
+así que, si algún día publicas el repositorio, conviene quitar el logo.

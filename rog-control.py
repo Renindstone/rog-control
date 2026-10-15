@@ -1,21 +1,107 @@
 #!/usr/bin/env python3
 """ROG Control: a small Armoury Crate replacement for the ROG Harpe Ace Mini on Linux."""
 
+import math
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gdk, GLib, Gtk  # noqa: E402
+gi.require_version("Rsvg", "2.0")
+from gi.repository import Adw, Gdk, GLib, Graphene, Gtk, Rsvg  # noqa: E402
 
 from rogmouse import device as dev  # noqa: E402
 from rogmouse.hid import DeviceAsleep, MouseError  # noqa: E402
 
 APP_ID = "io.github.rogcontrol.HarpeAceMini"
+LOGO_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "rog-logo.svg")
+
+
+class LogoBackdrop(Gtk.Widget):
+    """Decorative ROG logo behind the whole window, bleeding off the right edge.
+
+    Every look-and-feel knob is a class constant below; change them and reopen the app.
+    Sizes are measured on the visible shape of the logo *after* rotation, so the
+    margins and the visible fraction hold at any angle.
+    """
+
+    COLOR = "#9ca0a8"  # fill color of the logo
+    OPACITY = 0.60     # 0 = invisible, 1 = solid
+    ROTATION = -15     # degrees; negative = counterclockwise (to the left)
+    HEIGHT = 0.70      # fraction of the window height (0.70 leaves 15% top and bottom)
+    VISIBLE = 0.80     # fraction of the logo's width left on screen; the rest bleeds off the right
+    MAX_WIDTH = 0.95   # in narrow windows, shrink so the logo never covers more than this of the width
+
+    def __init__(self):
+        super().__init__(can_target=False, hexpand=True, vexpand=True)
+        self.set_opacity(self.OPACITY)
+        self.handle = None
+        if os.path.exists(LOGO_PATH):
+            self.handle = Rsvg.Handle.new_from_file(LOGO_PATH)
+            self.handle.set_stylesheet(f"path {{ fill: {self.COLOR}; }}".encode())
+            ok, w, h = self.handle.get_intrinsic_size_in_pixels()
+            self.aspect = w / h if ok and h else 1.87
+            self.ink = self._rotated_ink_bounds()
+
+    def _draw(self, cr, cx, cy, height):
+        """Draw the logo centered on (cx, cy), `height` pixels tall before rotation."""
+        cr.save()
+        cr.translate(cx, cy)
+        cr.rotate(math.radians(self.ROTATION))
+        vp = Rsvg.Rectangle()
+        vp.width, vp.height = height * self.aspect, height
+        vp.x, vp.y = -vp.width / 2, -vp.height / 2
+        self.handle.render_document(cr, vp)
+        cr.restore()
+
+    def _rotated_ink_bounds(self):
+        """Bounds of the painted pixels of the rotated logo, in units of the logo's
+        height, relative to its center: (left, top, right, bottom).
+
+        The rotated bounding rectangle has empty corners, so it would make the logo
+        look smaller and off-center; rendering once and scanning the alpha is exact.
+        """
+        size = 512
+        unit = size / (self.aspect + 1)  # rotated logo always fits in size x size
+        surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
+        self._draw(cairo.Context(surf), size / 2, size / 2, unit)
+        surf.flush()
+        data, stride = bytes(surf.get_data()), surf.get_stride()
+        top = bottom = left = right = None
+        for y in range(size):
+            alpha = data[y * stride + 3 : y * stride + size * 4 : 4]
+            if alpha.strip(b"\0"):
+                top = y if top is None else top
+                bottom = y + 1
+                l = len(alpha) - len(alpha.lstrip(b"\0"))
+                r = len(alpha.rstrip(b"\0"))
+                left = l if left is None else min(left, l)
+                right = r if right is None else max(right, r)
+        half = size / 2
+        return ((left - half) / unit, (top - half) / unit, (right - half) / unit, (bottom - half) / unit)
+
+    def do_snapshot(self, snapshot):
+        if not self.handle:
+            return
+        W, H = self.get_width(), self.get_height()
+        left, top, right, bottom = self.ink
+        ink_w, ink_h = right - left, bottom - top
+
+        scale = H * self.HEIGHT / ink_h
+        if ink_w * scale * self.VISIBLE > W * self.MAX_WIDTH:
+            scale = W * self.MAX_WIDTH / (ink_w * self.VISIBLE)
+        # Place the visible shape: its left edge so VISIBLE of it is on screen,
+        # and vertically centered.
+        cx = W - ink_w * scale * self.VISIBLE - left * scale
+        cy = (H - ink_h * scale) / 2 - top * scale
+
+        cr = snapshot.append_cairo(Graphene.Rect().init(0, 0, W, H))
+        self._draw(cr, cx, cy, scale)
 
 
 def rgba(color):
@@ -66,7 +152,10 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(self.toasts)
 
         self.toolbar = Adw.ToolbarView()
-        self.toasts.set_child(self.toolbar)
+        backdrop = Gtk.Overlay(child=LogoBackdrop())
+        backdrop.add_overlay(self.toolbar)
+        backdrop.set_measure_overlay(self.toolbar, True)
+        self.toasts.set_child(backdrop)
 
         self.header = Adw.HeaderBar()
         self.toolbar.add_top_bar(self.header)

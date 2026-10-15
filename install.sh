@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 
 DEST="$HOME/.local/share/rog-control"
 mkdir -p "$DEST" "$HOME/.local/share/applications"
-cp -r rog-control.py rogmouse "$DEST/"
+cp -r rog-control.py rogmouse assets "$DEST/"
 rm -rf "$DEST/rogmouse/__pycache__"
 
 cat > "$HOME/.local/share/applications/io.github.rogcontrol.HarpeAceMini.desktop" <<EOF
