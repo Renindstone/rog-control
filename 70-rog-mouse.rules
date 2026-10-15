@@ -1,0 +1,4 @@
+# Let the logged-in user configure ASUS ROG mice (wired) and the ROG Omni Receiver
+# without root. "uaccess" only grants access to the user at the physical seat.
+KERNEL=="hidraw*", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="1b63", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0b05", ATTRS{idProduct}=="1ace", TAG+="uaccess"
